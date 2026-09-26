@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Strips a reference bundle produced by tools/pack-refs.sh so it can be hosted without
+    redistributing Beat Games code. See ../../README.md for why this exists.
+
+    Suto and beat-forge/GenericStripper are the usual tools, but both need Windows: GenericStripper
+    shells out to IPA.exe to resolve the mod loader dependencies. This does the part that matters for
+    a build-only bundle - it clears method bodies and leaves every type, field and signature intact -
+    on any platform with the .NET SDK.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>strip-refs</AssemblyName>
+    <RootNamespace>JDFixer.Tools</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mono.Cecil" Version="0.11.5" />
+  </ItemGroup>
+
+</Project>

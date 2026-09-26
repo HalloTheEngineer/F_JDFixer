@@ -244,20 +244,35 @@ them automatically for 1.44.1: [beat-forge/beatsaber-stripped](https://github.co
 the usual CI source, currently stops at 1.42.0. The assemblies are Beat Games' and cannot be committed
 here or attached to a public release. So they are supplied as one private bundle:
 
-1. On a machine that owns Beat Saber 1.44.1, package the 19 assemblies the project references:
+1. On a machine that owns Beat Saber 1.44.1, package the assemblies the project references:
 
    ```bash
    tools/pack-refs.sh /path/to/BeatSaber/ bs-refs.zip
    ```
 
-2. **Strip it** with [ProjectSIRA/Suto](https://github.com/ProjectSIRA/Suto) or
-   [beat-forge/GenericStripper](https://github.com/beat-forge/GenericStripper) so it contains no game
-   code. It must not be committed or published.
+2. **Strip it**, so the bundle carries no game code. It must not be committed or published.
 
-3. Upload it somewhere private - a private release asset, an S3 bucket, a private repository.
+   ```bash
+   dotnet build tools/strip-refs/strip-refs.csproj -c Release
+   mkdir stripped && unzip -q bs-refs.zip -d stripped
+   dotnet tools/strip-refs/bin/Release/net9.0/strip-refs.dll stripped/Refs
+   (cd stripped && zip -qr ../bs-refs-stripped.zip Refs)
+   ```
+
+   [ProjectSIRA/Suto](https://github.com/ProjectSIRA/Suto) and
+   [beat-forge/GenericStripper](https://github.com/beat-forge/GenericStripper) do the same job, but
+   both need Windows - GenericStripper shells out to `IPA.exe` to resolve the mod loader. The
+   `strip-refs` tool above runs anywhere the .NET SDK does, and is all this project needs: a build-only
+   bundle just has to keep its signatures.
+
+3. Upload the stripped zip somewhere private - a private release asset, an S3 bucket, a private
+   repository. Nothing here is public: the repository is public, so a public release asset would
+   publish Beat Games' assemblies.
 
 4. Add the repository secret `BS_REFS_URL` with its download URL, and `BS_REFS_TOKEN` as well if the
    URL needs a bearer token.
+
+Re-run `workflow_dispatch` on the **CI** workflow afterwards to confirm the build job goes green.
 
 Until that secret exists the build job fails with these instructions rather than skipping quietly, so
 a green run is never mistaken for a mod that was actually built. Pull requests from forks cannot read

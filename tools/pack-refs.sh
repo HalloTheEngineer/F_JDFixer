@@ -73,6 +73,11 @@ MANAGED_DLLS=(
 LIB_DLLS=(0Harmony)
 PLUGIN_DLLS=(BSML SiraUtil)
 
+# Not referenced by JDFixer.csproj, and not needed to compile it. They are here so the stripper can
+# resolve the references of DataModels.dll and BSML.dll and therefore strip those too - without them
+# the bundle would silently keep two assemblies' worth of game code.
+STRIP_ONLY_DLLS=(BGLib.FileStorage UnityEngine.TextCoreFontEngineModule)
+
 missing=()
 for name in "${MANAGED_DLLS[@]}"; do
     [[ -f "$MANAGED/$name.dll" ]] || missing+=("Beat Saber_Data/Managed/$name.dll")
@@ -82,6 +87,9 @@ for name in "${LIB_DLLS[@]}"; do
 done
 for name in "${PLUGIN_DLLS[@]}"; do
     [[ -f "$GAME_DIR/Plugins/$name.dll" ]] || missing+=("Plugins/$name.dll")
+done
+for name in "${STRIP_ONLY_DLLS[@]}"; do
+    [[ -f "$MANAGED/$name.dll" ]] || missing+=("Beat Saber_Data/Managed/$name.dll (strip helper)")
 done
 
 if (( ${#missing[@]} )); then
@@ -104,6 +112,9 @@ for name in "${LIB_DLLS[@]}"; do
 done
 for name in "${PLUGIN_DLLS[@]}"; do
     cp "$GAME_DIR/Plugins/$name.dll" "$outdir/Plugins/"
+done
+for name in "${STRIP_ONLY_DLLS[@]}"; do
+    cp "$MANAGED/$name.dll" "$outdir/Beat Saber_Data/Managed/"
 done
 
 # A manifest so a bundle can be traced back to what produced it. Hashes let CI notice that somebody
@@ -134,5 +145,12 @@ rm -f "$OUT"
 echo "wrote $OUT ($(du -h "$OUT" | cut -f1))"
 echo "game version: $game_version"
 echo
-echo "Next: strip it, upload it somewhere private, then set the repository secret"
-echo "  BS_REFS_URL to its download URL."
+cat <<EOF
+Next, strip it so the bundle carries no game code:
+
+  tools/strip-refs/bin/Release/net9.0/strip-refs.dll <unzipped-dir>
+  (dotnet build tools/strip-refs/strip-refs.csproj -c Release)
+
+then re-zip the stripped tree, upload it somewhere private, and set the repository
+secret BS_REFS_URL to its download URL. See the Continuous Integration section of the README.
+EOF
