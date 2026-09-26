@@ -19,6 +19,10 @@ jobs:
   # Tests. These need no game assemblies at all: the test project compiles Core/ directly against
   # net9.0, which is what makes this job useful on the very first run of a new checkout, on a fork,
   # and on a contributor's machine.
+  #
+  # Pinned to net9.0 on both operating systems. The project also multi-targets net48 on Windows, but
+  # that target takes a ProjectReference on JDFixer.csproj, so it needs the Beat Saber assemblies and
+  # cannot run here. Compiling the plugin for net48 is the build job's job, not this one's.
   # ---------------------------------------------------------------------------------------------
   test:
     name: Tests (${{ matrix.os }})
@@ -26,7 +30,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # windows-latest also builds the net48 target, which is the shipping one.
         os: [ubuntu-latest, windows-latest]
 
     steps:
@@ -42,6 +45,7 @@ jobs:
         run: >
           dotnet test Tests/JDFixer.Tests/JDFixer.Tests.csproj
           -c Release
+          -f net9.0
           --logger "trx;LogFileName=test-results.trx"
           --results-directory TestResults
 
