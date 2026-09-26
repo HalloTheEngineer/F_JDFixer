@@ -14,11 +14,18 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <!-- The test project lives inside the repo but must not be compiled into the plugin. -->
+  <!--
+    Tools and tests live inside the repo but must not be compiled into the plugin. Without this the
+    SDK glob picks up tools/strip-refs and its obj/ output, which then collides with the plugin's own
+    generated assembly attributes.
+  -->
   <ItemGroup>
     <Compile Remove="Tests\**" />
     <EmbeddedResource Remove="Tests\**" />
     <None Remove="Tests\**" />
+    <Compile Remove="tools\**" />
+    <EmbeddedResource Remove="tools\**" />
+    <None Remove="tools\**" />
   </ItemGroup>
 
   <!-- Beat Saber install location. Override on the command line, e.g.
