@@ -1,8 +1,19 @@
 ﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
     xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd'>
+    <!--
+        One adaptive layout for both display modes, replacing the former modifierUI.bsml /
+        legacyModifierUI.bsml pair.
+
+        Visibility is driven entirely by `active`, which BSML keeps live-bound, so switching
+        "Separate JD and RT sliders" in Mod Settings takes effect on the next return to this tab
+        without re-parsing. Layout is left to the container: the sliders are direct children rather
+        than wrapped in a fixed-height vertical, because a fixed height would leave a gap when one
+        slider is deactivated.
+    -->
     <settings-container child-control-width='true' child-expand-width='true' size-delta-y='-15'>
         <checkbox-setting value='enabled' on-change='set_enabled' text='Enabled'
                           hover-hint='Override base game settings'></checkbox-setting>
+
         <horizontal>
             <grid cell-size-y='5' cell-size-x='28' spacing-x='2' align='Right'>
                 <text text='~map_jd_rt' align='Left'/>
@@ -14,80 +25,157 @@
                 <text text='~map_min_jd' min-width='29' align='Right' hover-hint='Configure UI in Mod Settings'/>
             </grid>
         </horizontal>
-        <vertical vertical-fit='PreferredSize' preferred-height='14'>
-            <slider-setting id='jd_slider' value='jd_value' show-buttons='true' on-change='set_jd_value'
-                            apply-on-change='true' bind-value='true' text='Desired Jump Distance' increment='0.1'
-                            min='~min_jd_slider' max='~max_jd_slider' formatter='jd_slider_formatter'></slider-setting>
-            <slider-setting id='rt_slider' value='rt_value' show-buttons='true' on-change='set_rt_value'
-                            apply-on-change='true' bind-value='true' text='Reaction Time' increment='5'
-                            min='~min_rt_slider' max='~max_rt_slider' formatter='rt_slider_formatter'></slider-setting>
-        </vertical>
-		
-        <increment-setting value='increment_value' apply-on-change='true' bind-value='true' text='Automated Preferences'
-                           integer-only='true' min='0'
-                           max="~prefs_max" formatter='increment_formatter'
-                           hover-hint='Autoselect JD or RT based on NJS'/>
-        <button align='Center' on-click='pref_button_clicked' text='~pref_button'
-                hover-hint='Click to set up Automated Preferences'></button>
 
-        <vertical vertical-fit='PreferredSize' preferred-height='21'>
-            <increment-setting value='heuristic_increment_value' apply-on-change='true' bind-value='true'
-                               text='Bypass preference if map is closer...' integer-only='true' min='0' max='1'
-                               formatter='heuristic_increment_formatter'
-                               hover-hint='Run map at original JD and RT if it is lower than matching preference. Base game MUST be to Dynamic Default for this to work properly'/>
-            <horizontal>
-                <grid cell-size-y='5' cell-size-x='28' spacing-x='2' align='Right'>
-                    <text text='Bypass preference if NJS is...' min-width='29' italics='true' align='Left'/>
-                    <text text='----------------' min-width='29' align='Left' rich-text='true' font-color='#00000000'/>
-                    <text text='~thresholds' align='Right'
-                          hover-hint='Maps at, below, and above these NJS will run at their original JD and RT bypassing matching preference. Configure in Mod Settings'/>
-                </grid>
-            </horizontal>
-            <horizontal>
-                <text text='----------------' min-width='29' align='Left' rich-text='true' font-size='1'
-                      font-color='#00000000'/>
-            </horizontal>
-            <increment-setting value='slider_setting_value' apply-on-change='true' bind-value='true'
-                               text='Remember last setting for...' integer-only='true' min='0' max='1'
-                               formatter='slider_setting_increment_formatter'
-                               hover-hint='Choose which slider will hold its value when selecting maps'/>
-        </vertical>
+        <!--
+            In the default mode both sliders are always active. With "Separate JD and RT sliders"
+            on, exactly one is, chosen by the unit selector further down.
+        -->
+        <slider-setting id='jd_slider' value='jd_value' show-buttons='true' on-change='set_jd_value'
+                        apply-on-change='true' bind-value='true' text='Desired Jump Distance' increment='0.1'
+                        min='~min_jd_slider' max='~max_jd_slider' formatter='jd_slider_formatter'
+                        active='~show_jd_slider'></slider-setting>
+        <slider-setting id='rt_slider' value='rt_value' show-buttons='true' on-change='set_rt_value'
+                        apply-on-change='true' bind-value='true' text='~rt_slider_text' increment='5'
+                        min='~min_rt_slider' max='~max_rt_slider' formatter='rt_slider_formatter'
+                        active='~show_rt_slider'></slider-setting>
+
+        <!--
+            Cross-unit readouts. Only meaningful when a single slider is showing, since otherwise the
+            hidden unit's slider already states its own value.
+        -->
+        <horizontal active='~show_rt_display'>
+            <grid cell-size-y='5' cell-size-x='28' spacing-x='2' align='Right'>
+                <text text='Reaction Time' align='Left'/>
+                <text text='----------------' align='Left' rich-text='true' font-color='#00000000'/>
+                <text text='~rt_display' min-width='29' align='Right'/>
+            </grid>
+        </horizontal>
+        <horizontal active='~show_jd_display'>
+            <grid cell-size-y='5' cell-size-x='28' spacing-x='2' align='Right'>
+                <text text='JumpDistance' align='Left'/>
+                <text text='----------------' align='Left' rich-text='true' font-color='#00000000'/>
+                <text text='~jd_display' min-width='29' align='Right'/>
+            </grid>
+        </horizontal>
+
+        <!-- Beat-offset snapping, which only applies in separate-slider mode. -->
+        <horizontal active='~show_snapped_jd'>
+            <grid cell-size-y='5' cell-size-x='28' spacing-x='2' align='Right'>
+                <text text='Snapped to...' align='Left'/>
+                <text text='--' align='Left' rich-text='true' font-color='#00000000'/>
+                <text text='~snapped_jd' min-width='29' align='Right'
+                      hover-hint='Configure 1/n in Mod Settings. Automated Preferences override snapping.'/>
+            </grid>
+        </horizontal>
+        <horizontal active='~show_snapped_rt'>
+            <grid cell-size-y='5' cell-size-x='28' spacing-x='2' align='Right'>
+                <text text='Snapped to...' align='Left'/>
+                <text text='--' align='Left' rich-text='true' font-color='#00000000'/>
+                <text text='~snapped_rt' min-width='29' align='Right'
+                      hover-hint='Configure 1/n in Mod Settings. Automated Preferences override snapping.'/>
+            </grid>
+        </horizontal>
+
+        <increment-setting value='increment_value' apply-on-change='true' bind-value='true' text='Automated Preferences'
+                       integer-only='true' min='0'
+                       max="~prefs_max" formatter='increment_formatter'
+                       hover-hint='Autoselect JD or RT based on NJS'/>
+    <button align='Center' on-click='pref_button_clicked' text='~pref_button'
+            hover-hint='Click to set up Automated Preferences'></button>
+
+        <!--
+            These were wrapped in a <vertical preferred-height='21'>. A fixed height is a guess, and it
+            showed: whenever the content did not fill it exactly, the remainder rendered as a gap, and
+            when it overflowed, the rows were squeezed together. Direct children of the settings
+            container size to their own content instead.
+        -->
+        <increment-setting value='heuristic_increment_value' apply-on-change='true' bind-value='true'
+                           text='Bypass preference if map is closer...' integer-only='true' min='0' max='1'
+                           formatter='heuristic_increment_formatter'
+                           hover-hint='Run map at original JD and RT if it is lower than matching preference. Base game MUST be to Dynamic Default for this to work properly'/>
+        <horizontal>
+            <grid cell-size-y='5' cell-size-x='28' spacing-x='2' align='Right'>
+                <text text='Bypass preference if NJS is...' min-width='29' italics='true' align='Left'/>
+                <text text='----------------' min-width='29' align='Left' rich-text='true' font-color='#00000000'/>
+                <text text='~thresholds' align='Right'
+                      hover-hint='Maps at, below, and above these NJS will run at their original JD and RT bypassing matching preference. Configure in Mod Settings'/>
+            </grid>
+        </horizontal>
+        <!--
+            The hint is static, and deliberately so. A ~-bound hover-hint is re-created by BSML via
+            Zenject every time the value raises, and this control's values are raised in bulk when the
+            display mode changes - including from the main menu's teardown, where the element is
+            already being destroyed. That threw a NullReferenceException out of
+            RectTransformHandler.AddHoverHint. Do not bind a hover-hint to anything RaiseAll touches.
+        -->
+        <increment-setting value='slider_setting_value' apply-on-change='true' bind-value='true'
+                           text='~slider_setting_text' integer-only='true' min='0' max='1'
+                           formatter='slider_setting_increment_formatter'
+                           hover-hint='Choose whether the slider edits jump distance or reaction time, and which of the two holds its value between maps.'/>
+        <!--
+            Options, ported from the settings menu so they can be changed here rather than by leaving
+            gameplay setup. Everything applies immediately; there is no OK press. The settings menu keeps
+            the same controls, and the slider range stays there because it bounds the whole tab rather
+            than describing the selected map.
+        -->
+        <horizontal preferred-height='4'>
+            <text text='Display' font-size='3' align='Center' font-color='#8c8c8cff'></text>
+        </horizontal>
+
+        <checkbox-setting value='rt_display_value' on-change='set_rt_display' apply-on-change='true'
+                          text='Show map Reaction Times'
+                          hover-hint='Also show the original and minimum reaction time of the selected map.'></checkbox-setting>
+
+        <checkbox-setting value='separate_sliders_value' on-change='set_separate_sliders' apply-on-change='true'
+                          text='Separate JD and RT sliders'
+                          hover-hint='Show one slider at a time and pick whether it edits jump distance or reaction time. The snapping options below only work in this mode.'></checkbox-setting>
+
+        <checkbox-setting value='use_offset_value' on-change='set_use_offset' apply-on-change='true'
+                          text='Snap to fractions of a beat'
+                          active='~show_offset_options'
+                          hover-hint='Round the jump distance to a fraction of the map beat offset. Requires Separate JD and RT sliders.'></checkbox-setting>
+
+        <increment-setting value='offset_fraction_value' apply-on-change='true' bind-value='true'
+                           text='Beat fraction (1/n)' integer-only='true' min='2' max='64'
+                           active='~show_offset_fraction'
+                           hover-hint='The snap step is 1/n of a beat. Smaller n snaps more often.'/>
+
+        <increment-setting value='song_speed_increment_value' apply-on-change='true' bind-value='true'
+                           text='For song speed, use...' integer-only='true' min='0' max='2'
+                           formatter='song_speed_increment_formatter'
+                           hover-hint='Choose whether song speed affects jump distance, reaction time, or neither.'/>
+
+        <horizontal preferred-height='4'>
+            <text text='NJS Thresholds' font-size='3' align='Center' font-color='#8c8c8cff'></text>
+        </horizontal>
+
+        <slider-setting value='lower_threshold_value' apply-on-change='true' bind-value='true'
+                        text='Lower' increment='1' min='1' max='100'
+                        hover-hint='Maps at or below this note jump speed play at their own jump distance instead of the selected preference.'></slider-setting>
+
+        <slider-setting value='upper_threshold_value' apply-on-change='true' bind-value='true'
+                        text='Upper' increment='1' min='1' max='100'
+                        hover-hint='Maps at or above this note jump speed play at their own jump distance. Set both to 1 and 100 to disable.'></slider-setting>
+
+        <horizontal preferred-height='4'>
+            <text text='Note Presentation' font-size='3' align='Center' font-color='#8c8c8cff'></text>
+        </horizontal>
+
+        <checkbox-setting value='instant_note_rotation_value' on-change='set_instant_note_rotation' apply-on-change='true'
+                          text='Instant Note Rotation'
+                          hover-hint='Notes appear at their final cut angle immediately instead of swinging into place.'></checkbox-setting>
+
+        <checkbox-setting value='disable_look_ahead_value' on-change='set_disable_look_ahead' apply-on-change='true'
+                          text='Disable Look Ahead'
+                          hover-hint='Notes stay hidden during the movement before the jump. Pairs well with high jump distances.'></checkbox-setting>
+
+        <checkbox-setting value='njs_event_compensation_value' on-change='set_njs_event_compensation' apply-on-change='true'
+                          text='Compensate for NJS Events'
+                          hover-hint='Hold your chosen reaction time on maps that change note jump speed mid-song.'></checkbox-setting>
+
+        <checkbox-setting value='remove_pause_value' on-change='set_remove_pause' apply-on-change='true'
+                          text='Remove Pausing'
+                          hover-hint='Stop the game pausing when the headset is unmounted or loses focus. Can affect leaderboard eligibility.'></checkbox-setting>
     </settings-container>
-    <vertical pad-top='54' align='Center'>
-        <horizontal>
-            <text text='Instructions at github.com/zeph-yr/JDFixer     v7.4.0' font-color='#ff0080ff' font-size='3'
-                  align='Right' hover-hint="Read this to get the most out of the features"></text>
-            <clickable-text text='~open_donate_text' rich-text='true' font-color='#ff0080ff' align='Left'
-                            click-event='show_donate_modal' on-click='open_donate_modal'
-                            hover-hint='~open_donate_hint'/>
-        </horizontal>
-        <horizontal>
-            <text text='~donate_update_dynamic' word-wrapping='true' rich-text='true' font-color='#00ff99ff'
-                  align='Center'></text>
-        </horizontal>
-        <modal id='donate_modal' show-event='show_donate_modal' hide-event='hide_donate_modal' click-off-closes='true'
-               move-to-center='true' size-delta-x='60' size-delta-y='60'>
-            <vertical>
-                <vertical pad-top='3' vertical-fit='PreferredSize' preferred-height='22'
-                          hover-hint='~donate_modal_hint_dynamic'>
-                    <horizontal preferred-width='56'>
-                        <text text='~donate_modal_text_static_1' word-wrapping='true' align='Center'
-                              rich-text='true'></text>
-                    </horizontal>
-                    <horizontal preferred-width='56'>
-                        <primary-button text='Patreon' font-size='3' align='Center' on-click='Open_Donate_Patreon'
-                                        hover-hint='Link opens in web broswer'/>
-                        <primary-button text='Kofi' font-size='3' align='Center' on-click='Open_Donate_Kofi'
-                                        hover-hint='Link opens in web broswer'/>
-                        <text text='~donate_modal_text_static_2' word-wrapping='true' align='Right'
-                              rich-text='true'></text>
-                    </horizontal>
-                </vertical>
-                <vertical horizontal-fit='PreferredSize' preferred-width='58' vertical-fit='Unconstrained'
-                          preferred-height='38'>
-                    <text-page text='~donate_modal_text_dynamic' word-wrapping='true' align='Left' rich-text='true'/>
-                </vertical>
-            </vertical>
-        </modal>
-    </vertical>
+
 </bg>

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    net48 is the shipping target. The net9.0 target exists so the pure numeric core can be tested on
+    machines without Mono (i.e. Linux CI), by compiling Core/ directly instead of taking a dependency
+    on the plugin assembly, which needs a Beat Saber install to resolve.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">net48;net9.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(OS)' != 'Windows_NT'">net9.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>JDFixer.Tests</AssemblyName>
+    <RootNamespace>JDFixer.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Nullable>disable</Nullable>
+    <!-- Never let a test run copy the plugin into the game folder. -->
+    <DisableCopyToGame>true</DisableCopyToGame>
+    <DisableZipRelease>true</DisableZipRelease>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+    <ProjectReference Include="..\..\JDFixer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <Compile Include="..\..\Core\**\*.cs" LinkBase="Core" />
+  </ItemGroup>
+
+</Project>

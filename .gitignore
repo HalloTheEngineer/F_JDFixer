@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Reference assemblies fetched by CI (tools/fetch-refs.sh). Must never be committed:
+# they are Beat Games binaries.
+.ci-refs/
+bs-refs.zip

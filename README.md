@@ -4,7 +4,7 @@ Was once based on Kylemc1413's NjsFixer but has grown to much more.
 
 I wanted a stripped down mod that focused only on JD modification to fix floaty maps without NJS/BPM modification since I don't use those features. I felt there was a gap between Njsfixer and Leveltweaks that isn't filled for JD-focused players and this is my interpretation for meeting those needs.
 
-Supports CustomCampaigns, Tournament Assistant, all flavors of Multiplayer, OST / DLC / Base Campaign. Score posting is unaffected. For Beat Saber 1.17.1+.
+Supports CustomCampaigns, Tournament Assistant, all flavors of Multiplayer, OST / DLC / Base Campaign. Score posting is unaffected. For Beat Saber 1.44.1+.
 
 ## New Features
 - **Selected map's original JD and RT is displayed.** You can easily decide if you want to use JDFixer without having to play the map to feel it. Saves time.
@@ -26,6 +26,46 @@ Supports CustomCampaigns, Tournament Assistant, all flavors of Multiplayer, OST 
 ![screenshot](https://github.com/zeph-yr/JDFixer/blob/BS_1.26/Screenshots/6.0.0_menu_unlinked_2.png)
 ![screenshot](https://github.com/zeph-yr/JDFixer/blob/BS_1.26/Screenshots/6.0.0_preferences.png)
 
+
+## Note Presentation Options
+Four optional settings live in Mod Settings under **Note Presentation**. All are **off by default** and all are applied live, with no OK press. None of them change jump distance or reaction time.
+
+### Instant Note Rotation
+Stock Beat Saber animates a note's rotation with a two-stage swing over the first half of its jump: the note starts flat and rotates into its cut angle. With this on, the note is already at its final cut angle the moment it appears.
+
+The note's "rotate towards player" behaviour is unaffected.
+
+**Effect on the cut window:** the game judges a cut by transforming the saber's direction into the note's own local frame and requiring it to be within tolerance of -90 degrees *in that frame* (`NoteBasicCutInfoHelper.GetBasicCutInfo`). There is no separate "logical" rotation. Whether the transform that gets rotated is the same one the cut test reads cannot be determined from the game's code - both are assigned in the note prefab - so JDFixer logs the answer once, on the first note of your first song:
+
+```
+[hitbox probe] NoteController._noteTransform is ... NoteJump._rotatedObject - note rotation ...
+```
+
+If that line says the two are the same object, note rotation moves the cut frame, and this option can therefore change which cuts register during the first half of a jump. Most cuts land well after the rotation settles, so the practical effect is small, and it is in the opposite direction to what it sounds like: with the swing, the arrow you see is *not* the angle being tested, so removing the swing makes the visual and the hitbox agree. This is the same trade-off the standalone NoteMovementFix mod makes; it is not in that mod's "disables score submission" list for the same reason.
+
+If you are chasing leaderboards and would rather not risk it, leave it off. It is off by default for that reason.
+
+### Disable Look Ahead
+Before a note jumps, the game spends a fixed 0.5 seconds moving it from a starting point 100 units behind the player up to the jump line - the "look ahead" phase. High jump distances push that starting point further out, so notes can visibly pop in.
+
+With this on, notes are hidden during that phase and appear when the jump begins. (Note: simply skipping the look-ahead movement, which is what NoteMovementFix does, leaves notes hanging in the distance and then lurching forward; JDFixer places them at the jump line and hides them instead.)
+
+### Compensate for NJS Events
+Charts can contain NJS changes set by the mapper. Working through the base game's arithmetic:
+
+- When NJS **rises**, the jump duration is unchanged and the jump **distance grows**.
+- When NJS **falls**, the jump duration stretches by exactly the inverse factor while the jump **distance stays identical**.
+
+That second case is the "NJS cheesing" that quietly hands you extra time. Because JDFixer sets a beat *offset*, it already produces a jump distance that does not change through a downward ramp - so if you configured a **JD**, you are already getting exactly what you asked for and this option changes nothing for you.
+
+If you configured an **RT**, you are not: the distance holds but the duration grows, so your reaction time silently drifts upward through the ramp. Turn this on to hold the reaction time you chose instead. It applies only when reaction time is the authoritative setpoint (see [Song Speed Options](#understanding-song-speed-options)).
+
+### Remove Pausing
+Stops the game pausing when the HMD is unmounted or loses focus, and ignores the pause button.
+
+Two cautions:
+- **Leaderboard eligibility.** A leaderboard may treat an unpaused disconnect differently. This is the main reason it is off by default.
+- **Mod conflicts.** ScoreSaber and BeatLeader patch the same three `PauseController` methods to implement their own replay pausing. With those installed the behaviour is whichever patch wins.
 
 ## How To Use
 - Place JDFixer.dll in Plugins folder
@@ -118,7 +158,9 @@ By base game behavior, maps maintain their JD when played at different song spee
 ## Understanding Variable NJS Base Game Mechanic in V4 Maps
 By base game behavior, maps can include NJS changes that are preset by the mapper. This allows for blocks to travel to the player at different speeds to create map effects and play experiences.
 
-**JDFixer does not override this, by design.**
+**JDFixer does not override this, by default.** See [Compensate for NJS Events](#compensate-for-njs-events) for the one case where you may want it to.
+
+By default:
 - JDFixer runs the entire map at the desired JD and any and all variable NJS experienced by the player is the same as if they were to play without JDFixer.
 - When running a map by RT, JDFixer sets the map's JD to give the desired RT with respect to the map's primary NJS value shown in the Song Info defined by the mapper. This means RT still varies accordingly if the map has variable NJS. Difficulty and speed changes are preserved.
 
@@ -144,6 +186,8 @@ By base game behavior, maps can include NJS changes that are preset by the mappe
 ![screenshot](https://github.com/zeph-yr/JDFixer/blob/BS_1.26/Screenshots/6.0.0_mp.png)
 
 ## Versions
+- v7.6.0 for BS 1.44.1+
+- v7.5.0 for BS 1.44.1+
 - v7.4.0 for BS 1.40.0+
 - v7.3.0 for BS 1.38.0 to 1.39.1
 - v7.2.6 for BS 1.36.2 / 1.37.0+
@@ -156,6 +200,75 @@ By base game behavior, maps can include NJS changes that are preset by the mappe
 - ≤v2.1.6 for BS ≤1.18.3 requires BS_Utils
 - v2.1.3+ will import your settings file
 - v2.1.0 is not compatible with settings files from previous versions: Delete or rename your old JDFixer.json and allow the mod to generate a new one. Re-enter your settings in-game. If you are knowledgeable, you can copy the relevant data from the old json file to the new one. Just make sure you do it correctly.
+
+## Building from Source
+The project is a standard SDK-style .NET Framework 4.8 library built with
+[BeatSaberModdingTools](https://github.com/Zingabopp/BeatSaberModdingTools.Tasks).
+
+```bash
+# Linux / non-default install location:
+dotnet build JDFixer.csproj -c Release -p:GameDirectory=/path/to/BeatSaber/
+```
+
+`GameDirectory` defaults to the Steam install path. `BeatSaberDir` is the deprecated name for the same
+thing and is no longer used.
+
+The numeric core - jump distance maths, the offset snap-point generator, the preference lookup and the
+setpoint resolver - is deliberately free of Unity, IPA and config dependencies so it can be unit tested
+without a game install:
+
+```bash
+dotnet test Tests/JDFixer.Tests/JDFixer.Tests.csproj
+```
+
+The test project multi-targets: `net48` on Windows, where it runs against the shipped plugin assembly,
+and `net9.0` everywhere else, where it compiles `Core/` directly so the pure logic can be verified without
+Mono. 157 tests cover the round trip between a requested jump distance and the beat offset handed to the
+game, the 0.25 beat floor, offset fractions at their extremes, the preference lookup, the slider range
+guards, the donate banner's text parser, and a BSML contract check that fails the build when a `.bsml`
+file references a binding the host type does not have.
+
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every push and pull request. It has two jobs:
+
+- **Tests** - the full suite on `ubuntu-latest` and `windows-latest`. Windows also covers the `net48`
+  target. Needs nothing but the repository.
+- **Build mod** - builds the release zip and attaches it, the assembly, and the pdb as a build
+  artifact. This job needs the Beat Saber reference assemblies.
+
+### One-time setup for the build job
+
+`BeatSaberModdingTools` reads the game assemblies from a local install, and there is no way to fetch
+them automatically for 1.44.1: [beat-forge/beatsaber-stripped](https://github.com/beat-forge/beatsaber-stripped),
+the usual CI source, currently stops at 1.42.0. The assemblies are Beat Games' and cannot be committed
+here or attached to a public release. So they are supplied as one private bundle:
+
+1. On a machine that owns Beat Saber 1.44.1, package the 19 assemblies the project references:
+
+   ```bash
+   tools/pack-refs.sh /path/to/BeatSaber/ bs-refs.zip
+   ```
+
+2. **Strip it** with [ProjectSIRA/Suto](https://github.com/ProjectSIRA/Suto) or
+   [beat-forge/GenericStripper](https://github.com/beat-forge/GenericStripper) so it contains no game
+   code. It must not be committed or published.
+
+3. Upload it somewhere private - a private release asset, an S3 bucket, a private repository.
+
+4. Add the repository secret `BS_REFS_URL` with its download URL, and `BS_REFS_TOKEN` as well if the
+   URL needs a bearer token.
+
+Until that secret exists the build job fails with these instructions rather than skipping quietly, so
+a green run is never mistaken for a mod that was actually built. Pull requests from forks cannot read
+the secret and will fail at that step; the test job still runs for them.
+
+`tools/fetch-refs.sh` verifies the bundle is complete and was built for the game version in
+`manifest.json`, so a stale bundle produces one clear message instead of a wall of missing-type errors.
+
+**Adding a Harmony patch:** verify the target exists before shipping it. Every patch target JDFixer uses
+is a single declared overload on a known type in 1.44.1; a name collision or a signature change is the
+usual reason a Beat Saber mod silently stops patching after a game update.
 
 ## About
 Copyright © 2021 - 2025 Zephyr | www.xephai.com

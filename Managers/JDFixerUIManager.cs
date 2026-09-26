@@ -1,7 +1,8 @@
-﻿using CustomCampaigns.Campaign.Missions;
-using JDFixer.Interfaces;
+﻿using JDFixer.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Zenject;
 
 
@@ -15,10 +16,17 @@ namespace JDFixer.Managers
         private static MainMenuViewController mainMenu;
 
         private readonly List<IBeatmapInfoUpdater> beatmapInfoUpdaters;
+        private readonly List<IRefreshable> refreshables;
 
 
         [Inject]
-        private JDFixerUIManager(StandardLevelDetailViewController standardLevelDetailViewController, MissionSelectionMapViewController missionSelectionMapViewController, BeatmapLevelsModel beatmapLevelsModel, MainMenuViewController mainMenuViewController, List<IBeatmapInfoUpdater> iBeatmapInfoUpdaters)
+        private JDFixerUIManager(
+            StandardLevelDetailViewController standardLevelDetailViewController,
+            MissionSelectionMapViewController missionSelectionMapViewController,
+            BeatmapLevelsModel beatmapLevelsModel,
+            MainMenuViewController mainMenuViewController,
+            List<IBeatmapInfoUpdater> iBeatmapInfoUpdaters,
+            List<IRefreshable> refreshableViews)
         {
             //Plugin.Log.Debug("JDFixerUIManager()");
 
@@ -28,6 +36,7 @@ namespace JDFixer.Managers
             mainMenu = mainMenuViewController;
 
             beatmapInfoUpdaters = iBeatmapInfoUpdaters;
+            refreshables = refreshableViews;
         }
 
 
@@ -71,7 +80,7 @@ namespace JDFixer.Managers
 
             if (arg1 != null)
             {
-                DiffcultyBeatmapUpdated(arg1.beatmapKey, arg1.beatmapLevel);
+                BeatmapUpdated(arg1.beatmapKey, arg1.beatmapLevel);
             }
         }
 
@@ -85,86 +94,108 @@ namespace JDFixer.Managers
                 //Plugin.Log.Debug("NJS: " + arg1.selectedDifficultyBeatmap.noteJumpMovementSpeed);
                 //Plugin.Log.Debug("Offset: " + arg1.selectedDifficultyBeatmap.noteJumpStartBeatOffset);
 
-                DiffcultyBeatmapUpdated(arg1.beatmapKey, arg1.beatmapLevel); //selectedDifficultyBeatmap);
+                BeatmapUpdated(arg1.beatmapKey, arg1.beatmapLevel); //selectedDifficultyBeatmap);
             }
         }
 
 
-        private void MissionSelection_didSelectMissionLevelEvent_CC(MissionSelectionMapViewController arg1, MissionNode arg2)
+        private void MissionSelection_didSelectMissionLevelEvent_CC(MissionSelectionMapViewController controller, MissionNode node)
         {
-            // Yes, we must check for both arg2.missionData and arg2.missionData.beatmapCharacteristic:
-            // If a map is not dled, missionID and beatmapDifficulty will be correct, but beatmapCharacteristic will be null
-            // Accessing any null values of arg1 or arg2 will crash CC horribly
-
-            if (arg2.missionData != null && arg2.missionData.beatmapCharacteristic != null)
+            // Both missionData and missionData.beatmapCharacteristic must be checked: for a map that is
+            // not downloaded, missionID and beatmapDifficulty are still correct but
+            // beatmapCharacteristic is null, and dereferencing either crashes CustomCampaigns.
+            if (node?.missionData?.beatmapCharacteristic == null)
             {
-                Plugin.Log.Debug("In CC, MissionNode exists");
+                // Map not downloaded.
+                BeatmapUpdated(new BeatmapKey(), null);
+                return;
+            }
 
-                //Plugin.Log.Debug("MissionNode - missionid: " + arg2.missionId); //"<color=#0a92ea>[STND]</color> Holdin' Oneb28Easy-1"
-                //Plugin.Log.Debug("MissionNode - difficulty: " + arg2.missionData.beatmapDifficulty); // "Easy" etc
-                //Plugin.Log.Debug("MissionNode - characteristic: " + arg2.missionData.beatmapCharacteristic.serializedName); //"Standard" etc
+            Plugin.Log.Debug("In CC, MissionNode exists");
 
-                if (MissionSelectionPatch.cc_level != null) // lol null check just to print?
+            // CustomMissionDataSO.beatmapLevel exists only in CustomCampaigns, so it is resolved
+            // reflectively to avoid a compile-time dependency on the CC assembly. If CC renames the
+            // property the map simply shows no jump distance, which is better than a hard failure.
+            var missionData = node.missionData;
+            var beatmapLevel = CustomCampaignsBeatmapLevel?.Invoke(missionData) as BeatmapLevel;
+
+            if (beatmapLevel != null)
+            {
+                BeatmapUpdated(missionData.beatmapKey, beatmapLevel);
+            }
+        }
+
+
+        private void MissionSelection_didSelectMissionLevelEvent_Base(MissionSelectionMapViewController controller, MissionNode node)
+        {
+            // Base campaign. missionData is null for nodes with no mission assigned, so it needs the
+            // same guard the CustomCampaigns path has.
+            if (node?.missionData == null)
+            {
+                return;
+            }
+
+            var beatmapKey = node.missionData.beatmapKey;
+            BeatmapUpdated(beatmapKey, levelsModel?.GetBeatmapLevel(beatmapKey.levelId));
+        }
+
+        /// <summary>
+        /// Accessor for <c>CustomMissionDataSO.beatmapLevel</c>, resolved once. Null when
+        /// CustomCampaigns is not installed, in which case the CC path degrades to showing nothing
+        /// rather than throwing on every map selection.
+        /// </summary>
+        private static readonly Func<object, object> CustomCampaignsBeatmapLevel = CreateCustomCampaignsAccessor();
+
+        private static Func<object, object> CreateCustomCampaignsAccessor()
+        {
+            try
+            {
+                Type customMissionData = AppDomain.CurrentDomain
+                    .GetAssemblies()
+                    .Select(a => a.GetType("CustomCampaigns.CustomMissionDataSO", throwOnError: false))
+                    .FirstOrDefault(t => t != null);
+
+                if (customMissionData == null)
                 {
-                    // If a map is not dled, this will be the previous selected node's map
-                    Plugin.Log.Debug("CC Level: " + MissionSelectionPatch.cc_level.levelID);  // For cross check with arg2.missionId
-
-                    if (arg2.missionData is CustomMissionDataSO)
-                    {
-                        BeatmapLevel beatmapLevel = (arg2.missionData as CustomMissionDataSO).beatmapLevel;
-
-                        if (beatmapLevel != null) // lol null check just to print?
-                        {
-                            DiffcultyBeatmapUpdated(arg2.missionData.beatmapKey, beatmapLevel);
-                        }
-                    }
+                    Plugin.Log.Debug("CustomCampaigns not present; CC jump distance display disabled");
+                    return null;
                 }
-            }
-            else // Map not dled
-            {
-                DiffcultyBeatmapUpdated(new BeatmapKey(), null);
-            }
-        }
 
+                PropertyInfo property = customMissionData.GetProperty("beatmapLevel", BindingFlags.Public | BindingFlags.Instance);
+                if (property == null)
+                {
+                    Plugin.Log.Warn("CustomMissionDataSO.beatmapLevel not found; CC jump distance display disabled");
+                    return null;
+                }
 
-        private void MissionSelection_didSelectMissionLevelEvent_Base(MissionSelectionMapViewController arg1, MissionNode arg2)
-        {
-            // Base campaign
-            if (arg2 != null)
+                return missionData => property.GetValue(missionData);
+            }
+            catch (Exception e)
             {
-                DiffcultyBeatmapUpdated(arg2.missionData.beatmapKey, levelsModel.GetBeatmapLevel(arg2.missionData.beatmapKey.levelId));
+                Plugin.Log.Warn($"Failed to resolve CustomCampaigns beatmapLevel: {e.Message}");
+                return null;
             }
         }
 
 
         private void MainMenu_didDeactivateEvent(bool removedFromHierarchy, bool screenSystemDisabling)
         {
-            //Plugin.Log.Debug("MainMenu_didDeactivate");
-
-            if (UI.LegacyModifierUI.Instance != null)
+            foreach (var refreshable in refreshables)
             {
-                UI.LegacyModifierUI.Instance.Refresh();
-            }
-
-            if (UI.ModifierUI.Instance != null)
-            {
-                UI.ModifierUI.Instance.Refresh();
-            }
-
-            if (UI.CustomOnlineUI.Instance != null)
-            {
-                UI.CustomOnlineUI.Instance.Refresh();
+                refreshable.Refresh();
             }
         }
 
 
-        private void DiffcultyBeatmapUpdated(BeatmapKey beatmapKey, BeatmapLevel beatmapLevel)
+        private void BeatmapUpdated(BeatmapKey beatmapKey, BeatmapLevel beatmapLevel)
         {
-            //Plugin.Log.Debug("DiffcultyBeatmapUpdated()");
+            // Built once and shared: the object is derived state that every subscriber reads, and
+            // constructing it per subscriber meant each view could observe a different instance.
+            var info = new BeatmapInfo(beatmapKey, beatmapLevel);
 
             foreach (var beatmapInfoUpdater in beatmapInfoUpdaters)
             {
-                beatmapInfoUpdater.BeatmapInfoUpdated(new BeatmapInfo(beatmapKey, beatmapLevel));
+                beatmapInfoUpdater.BeatmapInfoUpdated(info);
             }
         }
     }

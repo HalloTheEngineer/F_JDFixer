@@ -1,0 +1,131 @@
+name: CI
+
+# Runs on every push, so a broken commit is caught before it reaches the game rather than after.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push supersedes an in-flight run for the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------------------------
+  # Tests. These need no game assemblies at all: the test project compiles Core/ directly against
+  # net9.0, which is what makes this job useful on the very first run of a new checkout, on a fork,
+  # and on a contributor's machine.
+  # ---------------------------------------------------------------------------------------------
+  test:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # windows-latest also builds the net48 target, which is the shipping one.
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Run tests
+        run: >
+          dotnet test Tests/JDFixer.Tests/JDFixer.Tests.csproj
+          -c Release
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults/*.trx
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------------------------
+  # Build the mod and attach the release zip.
+  #
+  # Needs the Beat Saber reference assemblies, which cannot be obtained automatically for 1.44.1 -
+  # see the comment in tools/fetch-refs.sh. One-time setup is documented there; until BS_REFS_URL is
+  # set this job fails with instructions rather than skipping silently, so nobody mistakes a green
+  # run for a built mod. Pull requests from forks have no access to the secret and will fail here.
+  # ---------------------------------------------------------------------------------------------
+  build:
+    name: Build mod
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # BSMT stamps the artifact name with the commit hash, which needs real history.
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Read target game version from manifest
+        id: manifest
+        run: |
+          # manifest.json is written with a UTF-8 BOM. Current jq skips it, but stripping it here
+          # keeps this step from depending on the runner image's jq version.
+          json="$(sed '1s/^\xEF\xBB\xBF//' manifest.json)"
+          version="$(jq -r '.gameVersion' <<< "$json")"
+          echo "gameVersion=$version" >> "$GITHUB_OUTPUT"
+          modversion="$(jq -r '.version' <<< "$json")"
+          echo "modVersion=$modversion" >> "$GITHUB_OUTPUT"
+          echo "Mod targets Beat Saber $version"
+
+      - name: Fetch reference assemblies
+        env:
+          BS_REFS_URL: ${{ secrets.BS_REFS_URL }}
+          BS_REFS_TOKEN: ${{ secrets.BS_REFS_TOKEN }}
+          BS_EXPECTED_GAME_VERSION: ${{ steps.manifest.outputs.gameVersion }}
+        run: tools/fetch-refs.sh "$GITHUB_WORKSPACE/.ci-refs"
+
+      - name: Build
+        run: >
+          dotnet build JDFixer.csproj
+          -c Release
+          -p:GameDirectory=${{ github.workspace }}/.ci-refs/Refs/
+          -p:DisableCopyToGame=true
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Summarise
+        run: |
+          {
+            echo "### JDFixer build"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Game version | \`${{ steps.manifest.outputs.gameVersion }}\` |"
+            echo "| Mod version | \`${{ steps.manifest.outputs.modVersion }}\` |"
+            echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+            echo
+            echo "Attached below: the release zip and the raw assembly."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: JDFixer-${{ steps.manifest.outputs.gameVersion }}-${{ github.sha }}
+          path: |
+            bin/Release/zip/*.zip
+            bin/Release/Artifact/Plugins/JDFixer.dll
+            bin/Release/Artifact/Plugins/JDFixer.pdb
+          if-no-files-found: error
+          retention-days: 30

@@ -1,38 +1,166 @@
 ﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd'>
-	<vertical vertical-fit='PreferredSize' preferred-height='75' pad-right='20' pad-top='1' pad-bottom='3'>
+	<!--
+		Redesigned from the previous flat list. The changes that matter in a headset:
+
+		  - Explanatory paragraphs are gone. Each one became a hover hint, which every control here
+		    already had, so the detail is still available without permanently occupying panel height.
+		  - Section headers share one accent colour instead of three, so the eye can find a boundary.
+		  - Dependent controls are gated with `active`, which BSML keeps live-bound, rather than being
+		    left on screen with a hint explaining that they do nothing.
+		  - Every control applies immediately, so the footer no longer claims OK is required.
+	-->
+	<!--
+		A real scrolling container, matching BSML's own settings pages. This used to be a plain <vertical>
+		with a hardcoded preferred-height of 120, which is the worst of both worlds: the content could
+		neither scroll nor grow, so once the option list outgrew 120 the rows were squeezed and anything
+		under it was pushed off the panel. The controls are now direct children of the scroll view, which
+		is the arrangement BSML's settings-test.bsml uses.
+	-->
+	<settings-scroll-view pad-left='2' pad-right='20' pad-top='2' pad-bottom='3'>
+
 		<horizontal preferred-width='90'>
 			<text text='JDFixer UI Options' font-size='5' underlined='true' align='Center'></text>
 		</horizontal>
-			<checkbox-setting value ='rt_display_value' on-change='set_rt_display' text='Show map Reaction Times' hover-hint='Show or hide the maps original and minimum reaction times'></checkbox-setting>
-			<checkbox-setting value ='legacy_display_value' on-change='set_legacy_display' apply-on-change='false' text='Separate JD and RT sliders' hover-hint='Turn this on to use JD and RT sliders independently. Choose which slider to use in Mod Tab. Must press OK for this to take affect.'></checkbox-setting>
-			<checkbox-setting value ='use_offset_value' on-change='set_use_offset' apply-on-change='false' text='Snap JD and RT to fractions of a beat' hover-hint='Run map at multiples of its offset based on fractions of a beat. Must enable Separate JD and RT sliders to use this'></checkbox-setting>
-			<slider-setting id='offset_fraction_slider' value ='offset_fraction_value' show-buttons='true' on-change='set_offset_fraction' apply-on-change='true' bind-value='true' text='Beat fraction (1/n)' increment='1' min='2' max='64' hover-hint='Set value for n'></slider-setting>
-			<increment-setting value='song_speed_increment_value' apply-on-change='true' bind-value='true' text='For song speed, use...' integer-only='true' min='0' max='2' formatter='song_speed_increment_formatter' hover-hint='Choose whether song speed affects JD and RT settings and Automated Preferences. See manual for complete explanation.'/>
+
+		<!-- A real gap, not a transparent run of dashes. The dashes were a spacer hack whose
+		     font-size='1' text collapsed towards zero height, leaving section headers sitting on
+		     top of the row above. -->
+		<horizontal preferred-height='2'></horizontal>
+
 		<horizontal>
-			<text text='------' font-color='#00000000' font-size='1' align='Left'></text>
+			<text text='Display' font-size='4' underlined='true' font-color='#cc99ffff' align='Center'></text>
 		</horizontal>
+
+		<checkbox-setting value='rt_display_value' on-change='set_rt_display' apply-on-change='true'
+		                  text='Show map Reaction Times'
+		                  hover-hint='Also show the original and minimum reaction time of the selected map, next to its jump distance.'></checkbox-setting>
+
+		<checkbox-setting value='legacy_display_value' on-change='set_legacy_display' apply-on-change='true'
+		                  text='Separate JD and RT sliders'
+		                  hover-hint='Show one slider at a time and pick whether it edits jump distance or reaction time. The mod tab updates as soon as you leave this menu.'></checkbox-setting>
+
+		<!--
+			The gameplay patch only snaps to the beat offset when separate sliders are on, so the
+			offset controls are hidden rather than shown inert. The stored value is preserved, so
+			re-enabling separate sliders brings the previous setting back.
+		-->
+		<checkbox-setting value='use_offset_value' on-change='set_use_offset' apply-on-change='true'
+		                  text='Snap JD and RT to fractions of a beat'
+		                  active='~offset_available'
+		                  hover-hint='Round the jump distance to a fraction of the map beat offset. Requires Separate JD and RT sliders.'></checkbox-setting>
+
+		<slider-setting value='offset_fraction_value' show-buttons='true' on-change='set_offset_fraction'
+		                apply-on-change='true' bind-value='true' text='Beat fraction (1/n)'
+		                increment='1' min='2' max='64' active='~show_offset_fraction'
+		                hover-hint='The snap step is 1/n of a beat. Smaller n snaps more often. Whole numbers only; use JDFixer.json for fractions.'></slider-setting>
+
+		<!-- A real gap, not a transparent run of dashes. The dashes were a spacer hack whose
+		     font-size='1' text collapsed towards zero height, leaving section headers sitting on
+		     top of the row above. -->
+		<horizontal preferred-height='2'></horizontal>
+
 		<horizontal>
-			<text text='Automated Preferences Settings' font-size='5' underlined='true' font-color='#ffff00ff' align='Center'></text>
+			<text text='Slider Range' font-size='4' underlined='true' font-color='#cc99ffff' align='Center'></text>
 		</horizontal>
-		<vertical vertical-fit='PreferredSize' preferred-height='10'>
-			<horizontal preferred-width='90'>
-				<text text='Configure automated preferences to be bypassed if NJS is at, below or above thresholds.' font-size='3' font-color='#cc99ffff' align='Left'></text>
-			</horizontal>
-			<horizontal>
-				<text text='When a map triggers a threshold it will play at its original JD and RT.' font-size='3' font-color='#cc99ffff' align='Left'></text>
-			</horizontal>
-			<horizontal>
-				<text text='To disable thresholds, set values to 1 and 100' font-size='3' font-color='#cc99ffff' align='Left'></text>
-			</horizontal>
-		</vertical>
-		<slider-setting id='lower_threshold_slider' value ='lower_threshold_value' show-buttons='true' on-change='set_lower_threshold' apply-on-change='true' bind-value='true' text='Lower NJS Threshold' increment='1' min='1' max='100' hover-hint='Threshold is inclusive of this value. For decimal values, edit in json.'></slider-setting>
-		<slider-setting id='upper_threshold_slider' value ='upper_threshold_value' show-buttons='true' on-change='set_upper_threshold' apply-on-change='true' bind-value='true' text='Upper NJS Threshold' increment='1' min='1' max='100' hover-hint='Threshold is inclusive of this value. For decimal values, edit in json.'></slider-setting>
+
+		<!--
+			The base range: what the preference editor offers, and the window the gameplay patch snaps
+			within. The selected map widens it to whatever that map can actually do, so the mod tab
+			slider may allow a little more than the maximum set here. Each end is kept strictly below the
+			other, so the range can never invert.
+		-->
+		<slider-setting value='min_jd_value' show-buttons='true' on-change='set_min_jd'
+		                apply-on-change='true' bind-value='true' text='Minimum Jump Distance'
+		                increment='1' min='2' max='59'
+		                hover-hint='Base low end of the jump distance range. A map that cannot reach this low widens the mod tab slider rather than clamping you to it.'></slider-setting>
+
+		<slider-setting value='max_jd_value' show-buttons='true' on-change='set_max_jd'
+		                apply-on-change='true' bind-value='true' text='Maximum Jump Distance'
+		                increment='1' min='3' max='60'
+		                hover-hint='Base high end of the jump distance range. The game itself rejects very large values regardless of this setting.'></slider-setting>
+
+		<slider-setting value='min_rt_value' show-buttons='true' on-change='set_min_rt'
+		                apply-on-change='true' bind-value='true' text='Minimum Reaction Time'
+		                increment='1' min='50' max='3999'
+		                hover-hint='Base low end of the reaction time range, in milliseconds. A map that cannot reach this fast widens the mod tab slider.'></slider-setting>
+
+		<slider-setting value='max_rt_value' show-buttons='true' on-change='set_max_rt'
+		                apply-on-change='true' bind-value='true' text='Maximum Reaction Time'
+		                increment='1' min='51' max='4000'
+		                hover-hint='Base high end of the reaction time range, in milliseconds. Also the ceiling the preference editor will offer.'></slider-setting>
+
+		<!-- A real gap, not a transparent run of dashes. The dashes were a spacer hack whose
+		     font-size='1' text collapsed towards zero height, leaving section headers sitting on
+		     top of the row above. -->
+		<horizontal preferred-height='2'></horizontal>
+
 		<horizontal>
-			<text text='------' font-color='#00000000' font-size='1' align='Left'></text>
+			<text text='Song Speed' font-size='4' underlined='true' font-color='#cc99ffff' align='Center'></text>
 		</horizontal>
+
+		<increment-setting value='song_speed_increment_value' apply-on-change='true' bind-value='true'
+		                    text='For song speed, use...' integer-only='true' min='0' max='2'
+		                    formatter='song_speed_increment_formatter'
+		                    hover-hint='Choose whether song speed affects jump distance, reaction time, or neither. See the manual for the full explanation.'/>
+
+		<!-- A real gap, not a transparent run of dashes. The dashes were a spacer hack whose
+		     font-size='1' text collapsed towards zero height, leaving section headers sitting on
+		     top of the row above. -->
+		<horizontal preferred-height='2'></horizontal>
+
 		<horizontal>
-			<text text='~press_ok_text_1' rich-text='true' align='Right'></text>
+			<text text='Automated Preferences' font-size='4' underlined='true' font-color='#cc99ffff' align='Center'></text>
+		</horizontal>
+
+		<slider-setting value='lower_threshold_value' show-buttons='true' on-change='set_lower_threshold'
+		                apply-on-change='true' bind-value='true' text='Lower NJS Threshold'
+		                increment='1' min='1' max='100'
+		                hover-hint='Maps at or below this note jump speed play at their original jump distance instead of the selected preference. Set both thresholds to 1 and 100 to disable. Decimals need JDFixer.json.'></slider-setting>
+
+		<slider-setting value='upper_threshold_value' show-buttons='true' on-change='set_upper_threshold'
+		                apply-on-change='true' bind-value='true' text='Upper NJS Threshold'
+		                increment='1' min='1' max='100'
+		                hover-hint='Maps at or above this note jump speed play at their original jump distance instead of the selected preference. Set both thresholds to 1 and 100 to disable. Decimals need JDFixer.json.'></slider-setting>
+
+		<!-- A real gap, not a transparent run of dashes. The dashes were a spacer hack whose
+		     font-size='1' text collapsed towards zero height, leaving section headers sitting on
+		     top of the row above. -->
+		<horizontal preferred-height='2'></horizontal>
+
+		<horizontal>
+			<text text='Note Presentation' font-size='4' underlined='true' font-color='#cc99ffff' align='Center'></text>
+		</horizontal>
+
+		<checkbox-setting value='instant_note_rotation_value' on-change='set_instant_note_rotation' apply-on-change='true'
+		                  text='Instant Note Rotation'
+		                  hover-hint='Notes appear at their final cut angle immediately instead of swinging into place. See the manual for the effect on the cut window.'></checkbox-setting>
+
+		<checkbox-setting value='disable_look_ahead_value' on-change='set_disable_look_ahead' apply-on-change='true'
+		                  text='Disable Look Ahead'
+		                  hover-hint='Notes stay hidden during the movement before the jump and appear when it begins. Pairs well with high jump distances, which otherwise make notes pop in.'></checkbox-setting>
+
+		<checkbox-setting value='njs_event_compensation_value' on-change='set_njs_event_compensation' apply-on-change='true'
+		                  text='Compensate for NJS Events'
+		                  hover-hint='On maps that change note jump speed mid-song, hold your chosen reaction time instead of letting it drift upward. Only applies while reaction time is the value being set.'></checkbox-setting>
+
+		<checkbox-setting value='remove_pause_value' on-change='set_remove_pause' apply-on-change='true'
+		                  text='Remove Pausing'
+		                  hover-hint='Stop the game pausing when the headset is unmounted or loses focus, and ignore the pause button. This can affect leaderboard eligibility.'></checkbox-setting>
+
+		<!-- A real gap, not a transparent run of dashes. The dashes were a spacer hack whose
+		     font-size='1' text collapsed towards zero height, leaving section headers sitting on
+		     top of the row above. -->
+		<horizontal preferred-height='2'></horizontal>
+
+		<!-- Stacked, not side by side. Two align='Right' texts sharing one horizontal with no
+		     preferred-width overlapped each other whenever the panel was narrow. -->
+		<horizontal preferred-width='90'>
+			<text text='~press_ok_text_1' rich-text='true' align='Left'></text>
 			<text text='~press_ok_text_2' rich-text='true' align='Right' hover-hint='~press_ok_hint_2'></text>
 		</horizontal>
-	</vertical>
+		<horizontal preferred-width='90' preferred-height='4'>
+			<clickable-text text='~donate_text' rich-text='true' align='Center'
+			                on-click='open_donate' hover-hint='~donate_hint'/>
+		</horizontal>
+	</settings-scroll-view>
 </bg>

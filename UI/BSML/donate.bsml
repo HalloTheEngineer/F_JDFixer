@@ -1,0 +1,29 @@
+<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+    xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd'>
+    <!--
+        Own flow rather than a modal inside each gameplay tab. That modal was duplicated verbatim into
+        two markup files and needed a pair of EmitEvent calls to re-show itself; here the game's own back
+        button dismisses it, and a late fetch updates the text in place via Donate.Published.
+    -->
+    <vertical vertical-fit='PreferredSize' preferred-height='64' align='Center'>
+        <vertical vertical-fit='PreferredSize' preferred-height='22'
+                  hover-hint='~donate_hint_dynamic'>
+            <horizontal preferred-width='56'>
+                <text text='~donate_text_static_1' word-wrapping='true' align='Center'
+                      rich-text='true'></text>
+            </horizontal>
+            <horizontal preferred-width='56'>
+                <primary-button text='Patreon' font-size='3' align='Center' on-click='open_patreon'
+                                hover-hint='Link opens in web browser'/>
+                <primary-button text='Kofi' font-size='3' align='Center' on-click='open_kofi'
+                                hover-hint='Link opens in web browser'/>
+                <text text='~donate_text_static_2' word-wrapping='true' align='Right'
+                      rich-text='true'></text>
+            </horizontal>
+        </vertical>
+        <vertical horizontal-fit='PreferredSize' preferred-width='58' vertical-fit='Unconstrained'
+                  preferred-height='38'>
+            <text-page text='~donate_text_dynamic' word-wrapping='true' align='Left' rich-text='true'/>
+        </vertical>
+    </vertical>
+</bg>

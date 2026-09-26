@@ -2,17 +2,17 @@
   "$schema": "https://raw.githubusercontent.com/nike4613/ModSaber-MetadataFileSchema/master/Schema.json",
   "author": "Zephyr",
   "description": "Automatically change jump distance and reaction time according to customized preferences",
-  "gameVersion": "1.40.0",
+  "gameVersion": "1.44.1",
   "id": "JDFixer",
   "name": "JDFixer",
-  "version": "7.4.0",
+  "version": "7.6.0",
   "dependsOn": {
-    "BSIPA": "^4.3.5",
-    "BeatSaberMarkupLanguage": "^1.12.2",
-    "SiraUtil": "^3.1.12"
+    "BSIPA": "^4.3.7",
+    "BeatSaberMarkupLanguage": "^1.14.1",
+    "SiraUtil": "^3.3.1"
   },
-    "loadBefore": ["Chroma", "AccessAbility", "PlayFirst"],
-    "links": {
-        "donate": "https://www.patreon.com/xeph_yr"
-    }
+  "loadBefore": ["Chroma", "AccessAbility", "PlayFirst"],
+  "links": {
+    "donate": "https://www.patreon.com/xeph_yr"
+  }
 }

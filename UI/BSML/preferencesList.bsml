@@ -1,25 +1,35 @@
 ﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
     xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd'>
+    <!--
+        Shared by both the JD and RT preference lists. The unit-specific labels, bounds and description
+        come from the view controller, so there is one file rather than two near-identical ones.
+    -->
     <vertical>
         <horizontal preferred-width='80' child-control-width='true'>
-            <text text="Maps will automatically run using the [NJS | JD] setting that is equal or lower than the selected map's NJS. For constant JD across all maps, use [0 NJS | Desired JD]"
-                  align='Center' word-wrapping='true' font-size='3' font-color='#ffff00ff'/>
+            <text text='~header_text' align='Center' word-wrapping='true' font-size='3'
+                  font-color='~header_color'></text>
         </horizontal>
         <list id='pref_list' list-style='Simple' select-cell='select_pref' stick-scrolling="true"
               show-scrollbar="true"></list>
         <horizontal>
-            <button align='Center' text='Add' event-click='add_pressed'></button>
+            <!--
+                This opens the editor; the Add inside the modal is what commits. They used to share the
+                name 'add_pressed', with this button emitting the event of the same name as the one the
+                commit action was bound to. Two buttons reading "Add", one of which was a commit away
+                from writing a default-valued preference, was a poor trade for the saved keystroke.
+            -->
+            <button align='Center' text='Add Preference' event-click='open_editor'></button>
             <button align='Center' text='Remove Selected' on-click='remove_pressed'></button>
         </horizontal>
     </vertical>
-    <modal id='pref_modal' show-event='add_pressed' hide-event='hide_pref_modal' click-off-closes='true'
+    <modal id='pref_modal' show-event='open_editor' hide-event='hide_pref_modal' click-off-closes='true'
            move-to-center='true' size-delta-x='106' size-delta-y='34'>
         <settings-container child-control-width='true' child-expand-width='true' anchor-pos-y='-3' size-delta-y='0'>
-            <slider-setting id='njs_slider' show-buttons='true' value='njs_value' on-change='set_njs_value' text='NJS'
-                            increment='0.5' min='0' max='50'></slider-setting>
-            <slider-setting id='jd_slider' show-buttons='true' value='jd_value' on-change='set_jd_value'
-                            text='Desired Jump Distance' rich-text='true' increment='0.1' min='~min_jd_slider'
-                            max='~max_jd_slider'></slider-setting>
+            <slider-setting id='njs_slider' show-buttons='true' value='njs_value' on-change='set_njs_value'
+                            text='NJS' increment='0.5' min='0' max='50'></slider-setting>
+            <slider-setting id='value_slider' show-buttons='true' value='value' on-change='set_value'
+                            text='~value_label' increment='~value_increment' min='~min_slider' max='~max_slider'
+                            formatter='value_formatter'></slider-setting>
             <horizontal>
                 <button text='Add' on-click='add_pressed' click-event='hide_pref_modal'></button>
                 <button text='Cancel' click-event='hide_pref_modal'></button>
