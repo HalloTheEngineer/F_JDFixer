@@ -60,15 +60,19 @@ jobs:
   # ---------------------------------------------------------------------------------------------
   # Build the mod and attach the release zip.
   #
-  # Needs the Beat Saber reference assemblies, which cannot be obtained automatically for 1.44.1 -
-  # see the comment in tools/fetch-refs.sh. One-time setup is documented there; until BS_REFS_URL is
-  # set this job fails with instructions rather than skipping silently, so nobody mistakes a green
-  # run for a built mod. Pull requests from forks have no access to the secret and will fail here.
+  # DISABLED for now: gated on the BUILD_ARTIFACT repository variable, which is unset, so this job
+  # reports as skipped rather than failing. It was failing on purpose - the Beat Saber reference
+  # assemblies cannot be fetched for 1.44.1 and are not ours to redistribute - and a permanently red
+  # check trains people to ignore red. See the comment in tools/fetch-refs.sh.
+  #
+  # To re-enable, no code change is needed: Settings -> Secrets and variables -> Actions ->
+  # Variables -> New repository variable, name BUILD_ARTIFACT, value true.
   # ---------------------------------------------------------------------------------------------
   build:
     name: Build mod
     runs-on: ubuntu-latest
     needs: test
+    if: vars.BUILD_ARTIFACT == 'true'
 
     steps:
       - uses: actions/checkout@v4
